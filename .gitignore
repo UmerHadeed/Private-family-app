@@ -25,3 +25,4 @@ dist-ssr
 
 # Local deployment metadata
 .netlify/
+.vercel
