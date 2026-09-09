@@ -2,6 +2,9 @@
 
 `migrations/` is the canonical, append-only schema history for Private Family OS.
 
+- `0001_core.sql` defines household/profile/space/asset/agent/consent/audit boundaries and RLS.
+- `0002_ingestion.sql` adds opt-in source connections, idempotent ingestion jobs and the transactional outbox.
+
 ## Runtime rules
 
 - The migration role owns schema changes but is never used by the API.
