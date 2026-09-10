@@ -1,16 +1,26 @@
-# React + Vite
+# Private Family OS
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A privacy-first family memory application built with **Next.js**, **Supabase Auth OAuth**, **Supabase PostgreSQL**, and **Supabase Storage**.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Next.js 16 (App Router) and React 19
+- Supabase Auth with OAuth (Google enabled in the current sign-in flow)
+- Supabase PostgreSQL with Row Level Security (RLS)
+- Supabase Storage private bucket with space-level access policies
+- Vercel-ready deployment
 
-## React Compiler
+## Local setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Create a Supabase project.
+2. In **Authentication → Providers**, enable Google OAuth and set its client ID and secret.
+3. Add `http://localhost:3000/auth/callback` and your production callback URL under **Authentication → URL Configuration**.
+4. Copy `.env.example` to `.env.local` and provide the URL and publishable key from **Project Settings → API**.
+5. Apply database policies with `npx supabase db push` after linking the project, or paste `supabase/migrations/20260910110000_initial_schema.sql` into the Supabase SQL Editor.
+6. Run `npm install` then `npm run dev`.
 
-## Expanding the Oxlint configuration
+## Permission model
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+OAuth proves identity; it does **not** grant household access. PostgreSQL RLS enforces explicit household and space membership. Private media is stored in the non-public `family-assets` bucket, with objects named `{household_id}/{space_id}/{asset_id}/{filename}`. Storage access requires an active membership in that specific space.
+
+`SUPABASE_SERVICE_ROLE_KEY` is server-only. Do not expose it in browser code or commit it.

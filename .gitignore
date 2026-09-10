@@ -26,3 +26,7 @@ dist-ssr
 # Local deployment metadata
 .netlify/
 .vercel
+
+# Next.js build output
+.next/
+tsconfig.tsbuildinfo
