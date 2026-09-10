@@ -30,3 +30,6 @@ dist-ssr
 # Next.js build output
 .next/
 tsconfig.tsbuildinfo
+
+# Supabase CLI local metadata
+supabase/.temp/
