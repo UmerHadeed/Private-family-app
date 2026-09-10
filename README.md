@@ -13,9 +13,10 @@ A privacy-first family memory application built with **Next.js**, **Supabase Aut
 ## Local setup
 
 1. Create a Supabase project.
-2. In **Authentication → Providers**, enable Google OAuth and set its client ID and secret.
-3. Add `http://localhost:3000/auth/callback` and your production callback URL under **Authentication → URL Configuration**.
-4. Copy `.env.example` to `.env.local` and provide the URL and publishable key from **Project Settings → API**.
+2. In **Authentication → Providers**, enable Google OAuth and set its client ID and secret if you want Google sign-in.
+3. In **Authentication → Providers → Email**, keep Email enabled. Configure confirmation emails and a production SMTP provider before inviting real family members.
+4. Add `http://localhost:3000/auth/callback` and your production callback URL under **Authentication → URL Configuration**.
+5. Copy `.env.example` to `.env.local` and provide the URL and publishable key from **Project Settings → API**.
 5. Apply database policies with `npx supabase db push` after linking the project, or paste `supabase/migrations/20260910110000_initial_schema.sql` into the Supabase SQL Editor.
 6. Run `npm install` then `npm run dev`.
 

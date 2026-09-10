@@ -44,19 +44,35 @@ export default function App(){return <AuthGate><FamilyApp/></AuthGate>}
 function AuthGate({children}){
  const supabase=getSupabaseBrowserClient()
  const [state,setState]=useState(()=>({loading:Boolean(supabase),user:null,configured:Boolean(supabase)}))
+ const [mode,setMode]=useState('signin'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
  useEffect(()=>{
   if(!supabase)return
   supabase.auth.getUser().then(({data:{user}})=>setState({loading:false,user,configured:true}))
   const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>setState({loading:false,user:session?.user??null,configured:true}))
   return()=>subscription.unsubscribe()
  },[supabase])
- const signIn=async()=>{
+ const signInGoogle=async()=>{
   if(!supabase)return
-  await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:`${window.location.origin}/auth/callback`}})
+  setBusy(true);setMessage('')
+  const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:`${window.location.origin}/auth/callback`}})
+  if(error){setMessage(error.message);setBusy(false)}
+ }
+ const submitPassword=async event=>{
+  event.preventDefault()
+  if(!supabase||busy)return
+  setBusy(true);setMessage('')
+  const credentials={email:email.trim(),password}
+  const result=mode==='signin'
+   ?await supabase.auth.signInWithPassword(credentials)
+   :await supabase.auth.signUp({...credentials,options:{emailRedirectTo:`${window.location.origin}/auth/callback`}})
+  setBusy(false)
+  if(result.error){setMessage(result.error.message);return}
+  if(mode==='signup'&&!result.data.session){setMessage('Check your email to confirm your account, then sign in.');return}
+  setMessage(mode==='signup'?'Your account is ready.':'Signed in successfully.')
  }
  if(state.loading)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p>Checking your secure session…</p></div></div>
  if(!state.configured)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p className="eyebrow">PRIVATE FAMILY OS</p><h1>Connect Supabase to continue.</h1><p>Add <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> to <code>.env.local</code>.</p></div></div>
- if(!state.user)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p className="eyebrow">PRIVATE FAMILY OS</p><h1>Your family’s private memory layer.</h1><p>Sign in to access only the household spaces that have explicitly been shared with you.</p><button className="primary full" onClick={signIn}>Continue with Google</button><small>Signing in proves identity. Access is still controlled by household and space permissions.</small></div></div>
+ if(!state.user)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p className="eyebrow">PRIVATE FAMILY OS</p><h1>{mode==='signin'?'Welcome back.':'Create your private account.'}</h1><p>{mode==='signin'?'Sign in to access only the household spaces that have explicitly been shared with you.':'Your account is separate from household access. A household owner must still invite you to a space.'}</p><form className="auth-form" onSubmit={submitPassword}><label>Email<input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required /></label><label>Password<input type="password" autoComplete={mode==='signin'?'current-password':'new-password'} minLength="8" value={password} onChange={e=>setPassword(e.target.value)} required /></label><button className="primary full" disabled={busy}>{busy?'Please wait…':mode==='signin'?'Sign in':'Create account'}</button></form>{message&&<p className="auth-message" role="status">{message}</p>}<div className="auth-divider"><span>or</span></div><button className="secondary auth-google" disabled={busy} onClick={signInGoogle}>Continue with Google</button><button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='signin'?'signup':'signin');setMessage('')}}>{mode==='signin'?'New here? Create an account':'Already have an account? Sign in'}</button><small>Email/password and Google both use Supabase Auth. Signing in proves identity; household and space permissions control your data access.</small></div></div>
  return children
 }
 
