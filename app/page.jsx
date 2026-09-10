@@ -73,7 +73,34 @@ function AuthGate({children}){
  if(state.loading)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p>Checking your secure session…</p></div></div>
  if(!state.configured)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p className="eyebrow">PRIVATE FAMILY OS</p><h1>Connect Supabase to continue.</h1><p>Add <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> to <code>.env.local</code>.</p></div></div>
  if(!state.user)return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p className="eyebrow">PRIVATE FAMILY OS</p><h1>{mode==='signin'?'Welcome back.':'Create your private account.'}</h1><p>{mode==='signin'?'Sign in to access only the household spaces that have explicitly been shared with you.':'Your account is separate from household access. A household owner must still invite you to a space.'}</p><form className="auth-form" onSubmit={submitPassword}><label>Email<input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required /></label><label>Password<input type="password" autoComplete={mode==='signin'?'current-password':'new-password'} minLength="8" value={password} onChange={e=>setPassword(e.target.value)} required /></label><button className="primary full" disabled={busy}>{busy?'Please wait…':mode==='signin'?'Sign in':'Create account'}</button></form>{message&&<p className="auth-message" role="status">{message}</p>}<div className="auth-divider"><span>or</span></div><button className="secondary auth-google" disabled={busy} onClick={signInGoogle}>Continue with Google</button><button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='signin'?'signup':'signin');setMessage('')}}>{mode==='signin'?'New here? Create an account':'Already have an account? Sign in'}</button><small>Email/password and Google both use Supabase Auth. Signing in proves identity; household and space permissions control your data access.</small></div></div>
- return children
+ return <HouseholdGate supabase={supabase}>{children}</HouseholdGate>
+}
+
+function HouseholdGate({supabase,children}){
+ const [state,setState]=useState('checking'),[name,setName]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
+ useEffect(()=>{
+  let active=true
+  supabase.from('household_members').select('household_id').is('revoked_at',null).limit(1).then(({data,error})=>{
+   if(!active)return
+   if(error){setMessage('We could not check your household access. Please try again.');setState('error');return}
+   setState(data?.length?'ready':'onboarding')
+  })
+  return()=>{active=false}
+ },[supabase])
+ const createHousehold=async event=>{
+  event.preventDefault()
+  if(busy)return
+  const householdName=name.trim()
+  if(!householdName){setMessage('Give your household a name to continue.');return}
+  setBusy(true);setMessage('')
+  const {error}=await supabase.rpc('create_household_with_default_spaces',{household_name:householdName})
+  setBusy(false)
+  if(error){setMessage(error.message);return}
+  setState('ready')
+ }
+ if(state==='checking')return <div className="auth-screen"><div className="auth-card"><span className="logo">p</span><p>Checking your household access…</p></div></div>
+ if(state==='ready')return children
+ return <div className="auth-screen"><div className="auth-card onboarding-card"><span className="logo">p</span><p className="eyebrow">STEP 1 OF 2 · YOUR HOUSEHOLD</p><h1>Start your private family space.</h1><p>Create the household you control. We’ll set up a private vault just for you and a separate Family Space for things you intentionally share.</p><form className="auth-form" onSubmit={createHousehold}><label>Household name<input autoFocus maxLength="120" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. The Hadeed family" required /></label><button className="primary full" disabled={busy}>{busy?'Creating your spaces…':'Create my household'}</button></form>{message&&<p className="auth-message" role="alert">{message}</p>}<div className="onboarding-promise"><b>What happens next</b><p>You become the household owner. No one else gets access until you invite them and choose the exact space they can use.</p></div><button className="auth-switch" onClick={()=>supabase.auth.signOut()}>Use a different account</button></div></div>
 }
 
 function FamilyApp(){
