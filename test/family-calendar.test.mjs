@@ -46,6 +46,6 @@ test('Family Calendar UI persists event creation, invitees, RSVP, reminders and 
   assert.match(source, /rsvp_status: status/)
   assert.match(source, /recurrence_frequency/)
   assert.match(source, /expandEvents/)
-  assert.match(source, /Push and external calendar notifications are not connected yet/)
+  assert.match(source, /Browser push requires a registered device and enabled delivery preference/)
   assert.doesNotMatch(source, /local preview/i)
 })
