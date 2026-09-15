@@ -6,13 +6,15 @@ import './asset-detail.css'
 const sizeLabel = bytes => bytes < 1024 * 1024 ? `${Math.max(1, Math.ceil(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 const visual = asset => asset.voice ? 'Voice note' : asset.type
 
-export default function AssetDetail({ asset, supabase, context, spaces, close, onChanged, flash }) {
+export default function AssetDetail({ asset, supabase, context, spaces, profiles, close, onChanged, flash }) {
   const [title, setTitle] = useState(asset.title)
   const [editing, setEditing] = useState(false)
   const [shares, setShares] = useState([])
   const [destinationId, setDestinationId] = useState('')
   const [busy, setBusy] = useState(false)
   const [loadingShares, setLoadingShares] = useState(false)
+  const [tags, setTags] = useState(asset.profileTags || [])
+  const [tagId, setTagId] = useState('')
   const [error, setError] = useState('')
   const privateSource = asset.spaceType === 'private_vault' && asset.uploadedBy === context?.userId
   const destinations = useMemo(() => spaces.filter(space => space.space_type !== 'private_vault'), [spaces])
@@ -27,6 +29,26 @@ export default function AssetDetail({ asset, supabase, context, spaces, close, o
   }, [asset.id, privateSource, supabase])
 
   useEffect(() => { const timer = window.setTimeout(() => void loadShares(), 0); return () => window.clearTimeout(timer) }, [loadShares])
+
+  const addTag = async event => {
+    event.preventDefault()
+    if (!tagId || busy) return setError('Choose a family profile to tag.')
+    setBusy(true); setError('')
+    const { error: tagError } = await supabase.from('asset_people').insert({ asset_id: asset.id, profile_id: tagId, tagged_by_user_id: context.userId })
+    setBusy(false)
+    if (tagError) return setError(tagError.message)
+    const profile = profiles.find(item => item.id === tagId)
+    setTags(current => [...current, { id: tagId, name: profile?.display_name || 'Family profile' }]); setTagId(''); await onChanged(); flash('Profile tag added. Access has not changed.')
+  }
+
+  const removeTag = async tag => {
+    if (busy) return
+    setBusy(true); setError('')
+    const { error: removeError } = await supabase.from('asset_people').delete().eq('asset_id', asset.id).eq('profile_id', tag.id)
+    setBusy(false)
+    if (removeError) return setError(removeError.message)
+    setTags(current => current.filter(item => item.id !== tag.id)); await onChanged(); flash('Profile tag removed. Access has not changed.')
+  }
 
   const download = async () => {
     setBusy(true); setError('')
@@ -78,5 +100,7 @@ export default function AssetDetail({ asset, supabase, context, spaces, close, o
     await loadShares(); await onChanged(); flash('Shared copy removed. Your private original remains available.')
   }
 
-  return <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && close()}><section className="asset-detail-modal" role="dialog" aria-modal="true" aria-labelledby="asset-detail-title"><header><div><p className="kicker">{asset.scope === 'Private' ? 'MY VAULT · PRIVATE' : 'FAMILY MEMORY'}</p><h2 id="asset-detail-title">{asset.title}</h2><p>{visual(asset)} · {sizeLabel(asset.byteSize)} · saved {asset.date}</p></div><button className="modal-close" type="button" aria-label="Close" onClick={close}>×</button></header><section className="asset-preview"><div className={`asset-preview-icon ${asset.voice ? 'voice' : ''}`}>{asset.voice ? 'Voice' : asset.type}</div><div><b>Current audience</b><p>{asset.scope === 'Private' ? 'Only you, in My Vault.' : `${asset.spaceName || 'Shared Family Space'} members with current access.`}</p></div></section><div className="asset-detail-actions"><button className="secondary" onClick={() => void download()} disabled={busy}>Download original</button>{asset.uploadedBy === context?.userId && <button className="secondary" onClick={() => setEditing(value => !value)} disabled={busy}>{editing ? 'Cancel rename' : 'Rename item'}</button>}</div>{editing && <form className="rename-form" onSubmit={saveTitle}><label>File name<input autoFocus maxLength="512" value={title} onChange={event => setTitle(event.target.value)} /></label><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save name'}</button></form>}{privateSource && <section className="share-control"><header><div><p className="kicker">CONTROLLED SHARING</p><h3>Share a copy, not your vault</h3><p>Review who can access it. The original remains in My Vault and can be removed from the shared space at any time.</p></div></header>{destinations.length ? <form onSubmit={share}><label>Share a copy with<select value={destinationId} onChange={event => setDestinationId(event.target.value)} required><option value="">Choose shared Family Space</option>{destinations.map(space => <option key={space.id} value={space.id}>{space.name}</option>)}</select></label><div className="share-review"><b>Before you share</b><span>Every current member of the selected shared space can access the copied file. Future membership changes follow that space’s access rules.</span></div><button className="primary" disabled={busy}>{busy ? 'Creating shared copy…' : 'Review and share copy'}</button></form> : <p className="share-review">There is no shared Family Space you can contribute to yet.</p>}{loadingShares ? <p className="fine">Loading shared copies…</p> : shares.length ? <div className="active-shares"><b>Shared copies</b>{shares.map(share => <div key={share.id}><span>{share.destination?.name || 'Shared Family Space'}</span><button className="danger-text" disabled={busy} onClick={() => void revoke(share)}>Remove shared copy</button></div>)}</div> : <p className="fine">This item has not been shared from My Vault.</p>}</section>}{error && <p className="capture-error" role="alert">{error}</p>}</section></div>
+  const canTag = true
+  const availableProfiles = profiles.filter(profile => !tags.some(tag => tag.id === profile.id))
+  return <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && close()}><section className="asset-detail-modal" role="dialog" aria-modal="true" aria-labelledby="asset-detail-title"><header><div><p className="kicker">{asset.scope === 'Private' ? 'MY VAULT · PRIVATE' : 'FAMILY MEMORY'}</p><h2 id="asset-detail-title">{asset.title}</h2><p>{visual(asset)} · {sizeLabel(asset.byteSize)} · saved {asset.date}</p></div><button className="modal-close" type="button" aria-label="Close" onClick={close}>×</button></header><section className="asset-preview"><div className={`asset-preview-icon ${asset.voice ? 'voice' : ''}`}>{asset.voice ? 'Voice' : asset.type}</div><div><b>Current audience</b><p>{asset.scope === 'Private' ? 'Only you, in My Vault.' : `${asset.spaceName || 'Shared Family Space'} members with current access.`}</p></div></section><div className="asset-detail-actions"><button className="secondary" onClick={() => void download()} disabled={busy}>Download original</button>{asset.uploadedBy === context?.userId && <button className="secondary" onClick={() => setEditing(value => !value)} disabled={busy}>{editing ? 'Cancel rename' : 'Rename item'}</button>}</div>{editing && <form className="rename-form" onSubmit={saveTitle}><label>File name<input autoFocus maxLength="512" value={title} onChange={event => setTitle(event.target.value)} /></label><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save name'}</button></form>}<section className="profile-tags"><header><div><p className="kicker">FAMILY PROFILES</p><h3>People in this memory</h3><p>Tags describe the item. They never change who can access it.</p></div></header>{tags.length ? <div className="tag-list">{tags.map(tag => <span key={tag.id}>{tag.name}{canTag && <button aria-label={`Remove ${tag.name} tag`} disabled={busy} onClick={() => void removeTag(tag)}>×</button>}</span>)}</div> : <p className="fine">No family profiles tagged yet.</p>}{canTag && availableProfiles.length ? <form onSubmit={addTag}><label>Add profile tag<select value={tagId} onChange={event => setTagId(event.target.value)}><option value="">Choose a family profile</option>{availableProfiles.map(profile => <option value={profile.id} key={profile.id}>{profile.display_name}</option>)}</select></label><button className="secondary" disabled={busy}>Add profile tag</button></form> : null}</section>{privateSource && <section className="share-control"><header><div><p className="kicker">CONTROLLED SHARING</p><h3>Share a copy, not your vault</h3><p>Review who can access it. The original remains in My Vault and can be removed from the shared space at any time.</p></div></header>{destinations.length ? <form onSubmit={share}><label>Share a copy with<select value={destinationId} onChange={event => setDestinationId(event.target.value)} required><option value="">Choose shared Family Space</option>{destinations.map(space => <option key={space.id} value={space.id}>{space.name}</option>)}</select></label><div className="share-review"><b>Before you share</b><span>Every current member of the selected shared space can access the copied file. Future membership changes follow that space’s access rules.</span></div><button className="primary" disabled={busy}>{busy ? 'Creating shared copy…' : 'Review and share copy'}</button></form> : <p className="share-review">There is no shared Family Space you can contribute to yet.</p>}{loadingShares ? <p className="fine">Loading shared copies…</p> : shares.length ? <div className="active-shares"><b>Shared copies</b>{shares.map(share => <div key={share.id}><span>{share.destination?.name || 'Shared Family Space'}</span><button className="danger-text" disabled={busy} onClick={() => void revoke(share)}>Remove shared copy</button></div>)}</div> : <p className="fine">This item has not been shared from My Vault.</p>}</section>}{error && <p className="capture-error" role="alert">{error}</p>}</section></div>
 }
